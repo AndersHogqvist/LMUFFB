@@ -19,6 +19,7 @@
 #include "stb_image_write.h"
 #pragma warning(pop)
 #include <ctime>
+#include <chrono>
 
 #ifdef ENABLE_IMGUI
 #include "imgui.h"
@@ -49,6 +50,8 @@ static const int MIN_WINDOW_HEIGHT =
 // v0.5.7 Latency Warning Threshold
 static const int LATENCY_WARNING_THRESHOLD_MS =
     15; // Green if < 15ms, Red if >= 15ms
+
+static constexpr std::chrono::seconds CONNECT_ATTEMPT_INTERVAL(2);
 
 // v0.6.5 PrintWindow flag (define if not available in SDK)
 #ifndef PW_RENDERFULLCONTENT
@@ -815,14 +818,15 @@ void GuiLayer::DrawTuningWindow(FFBEngine &engine) {
   ImGui::Separator();
 
   // Connection Status
-  bool connected = GameConnector::Get().IsConnected();
-  if (connected) {
-    ImGui::TextColored(ImVec4(0, 1, 0, 1), "Connected to LMU");
+  if (!GameConnector::Get().IsConnected()) {
+    ImGui::TextColored(ImVec4(1, 0, 0, 1), "Connecting to LMU...");
+    static std::chrono::steady_clock::time_point last_check_time = std::chrono::steady_clock::now();
+    if (std::chrono::steady_clock::now() - last_check_time > CONNECT_ATTEMPT_INTERVAL) {
+        last_check_time = std::chrono::steady_clock::now();
+        GameConnector::Get().TryConnect();
+    }
   } else {
-    ImGui::TextColored(ImVec4(1, 0, 0, 1), "Disconnected from LMU");
-    ImGui::SameLine();
-    if (ImGui::Button("Retry"))
-      GameConnector::Get().TryConnect();
+    ImGui::TextColored(ImVec4(0, 1, 0, 1), "Connected to LMU");
   }
 
   // --- 1. TOP BAR (System Status & Quick Controls) ---
